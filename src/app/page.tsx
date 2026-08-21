@@ -16,10 +16,15 @@ import { ParsedCommand, SupportedLanguage, Suggestion } from '@/types';
 import { DEFAULT_LANGUAGE } from '@/lib/i18n/languages';
 
 export default function Home() {
+  const [mounted, setMounted] = useState(false);
   const [language, setLanguage] = useState<SupportedLanguage>(DEFAULT_LANGUAGE);
   const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
   const [commandLog, setCommandLog] = useState<{ text: string; ts: number }[]>([]);
   const [activeTab, setActiveTab] = useState<'list' | 'log'>('list');
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const {
     items,
@@ -40,6 +45,7 @@ export default function Home() {
   // ── Smart suggestions ────────────────────────────────────────────────────
 
   const suggestions = useMemo(() => {
+    if (!mounted) return [];
     const currentNames = items.map((i) => i.name);
     const all: Suggestion[] = [
       ...getHistorySuggestions(currentNames, 4),
@@ -47,7 +53,7 @@ export default function Home() {
       ...getSubstituteSuggestions(currentNames, 2),
     ];
     return all.filter((s) => !dismissedSuggestions.has(s.id)).slice(0, 6);
-  }, [items, dismissedSuggestions]);
+  }, [items, dismissedSuggestions, mounted]);
 
   // ── Voice command handler ─────────────────────────────────────────────────
 
