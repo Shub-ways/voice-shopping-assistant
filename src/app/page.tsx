@@ -19,7 +19,7 @@ export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [language, setLanguage] = useState<SupportedLanguage>(DEFAULT_LANGUAGE);
   const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
-  const [commandLog, setCommandLog] = useState<{ text: string; ts: number }[]>([]);
+  const [commandLog, setCommandLog] = useState<{ id: string; text: string; ts: number }[]>([]);
   const [activeTab, setActiveTab] = useState<'list' | 'log'>('list');
 
   useEffect(() => {
@@ -59,9 +59,16 @@ export default function Home() {
 
   const handleCommand = useCallback(
     (command: ParsedCommand) => {
-      // Log the command
+      // Log the command with unique id
       setCommandLog((prev) =>
-        [{ text: command.raw, ts: Date.now() }, ...prev].slice(0, 20)
+        [
+          {
+            id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            text: command.raw,
+            ts: Date.now(),
+          },
+          ...prev,
+        ].slice(0, 20)
       );
 
       switch (command.intent) {
@@ -270,7 +277,7 @@ export default function Home() {
                 ) : (
                   commandLog.map((entry) => (
                     <div
-                      key={entry.ts}
+                      key={entry.id}
                       className="flex items-center gap-3 px-4 py-2.5 bg-white/5 rounded-xl border border-white/5"
                     >
                       <Mic2 className="w-3.5 h-3.5 text-violet-400 flex-shrink-0" />
