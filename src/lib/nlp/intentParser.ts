@@ -40,10 +40,34 @@ const NOISE_WORDS = new Set([
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
+// ─── Known compound items (do not split these into separate words) ─────────
+
+const KNOWN_COMPOUNDS = new Set([
+  'ice cream', 'sweet potato', 'almond milk', 'oat milk', 'soy milk', 'coconut milk',
+  'peanut butter', 'paper towel', 'toilet paper', 'trash bag', 'plastic wrap', 'zip lock',
+  'kidney beans', 'energy drink', 'protein shake', 'protein bar', 'face wash', 'lip balm',
+  'olive oil', 'coconut oil', 'avocado oil', 'soy sauce', 'hot sauce', 'maple syrup',
+  'curry powder', 'turmeric powder', 'chili powder', 'green tea', 'black tea',
+  'shaving cream', 'nail polish', 'whole grain', 'greek yogurt', 'cottage cheese',
+  'cream cheese', 'sour cream', 'body wash', 'hand soap', 'dish soap', 'baking powder',
+  'baking soda', 'brown sugar', 'frozen pizza', 'frozen vegetables', 'frozen fruit',
+]);
+
+// Adjectives that modify the following noun (e.g. "organic apples" -> 1 item)
+const ADJECTIVE_MODIFIERS = new Set([
+  'organic', 'fresh', 'frozen', 'canned', 'dry', 'dried', 'salted', 'unsalted',
+  'raw', 'ripe', 'sweet', 'sour', 'spicy', 'hot', 'cold', 'large', 'small',
+  'medium', 'big', 'mini', 'whole', 'dark', 'white', 'red', 'green', 'black',
+  'brown', 'yellow', 'vegan', 'diet', 'low', 'fat', 'gluten-free', 'sugar-free',
+  'dairy-free', 'extra', 'pure', 'good', 'bad',
+]);
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
+
 function normalizeText(text: string): string {
   return text
     .toLowerCase()
-    .replace(/[.,!?;:'"""'']/g, '')
+    .replace(/[!?:]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -175,10 +199,7 @@ function stripIntentPhrases(text: string, language: SupportedLanguage): string {
 
 /**
  * Parses a raw voice transcript into a structured command.
- *
- * @param raw - The raw transcript string from the speech recognizer.
- * @param language - The active language code.
- * @returns A ParsedCommand object describing the user's intent.
+ * For multi-item commands, use parseVoiceCommands instead.
  */
 export function parseVoiceCommand(
   raw: string,
@@ -201,8 +222,8 @@ export function parseVoiceCommand(
 
   // For ADD / REMOVE / CHECK / UNCHECK / UNKNOWN
   const stripped = stripIntentPhrases(normalized, language);
-  const tokens = stripped.split(' ').filter(Boolean);
-  const { quantity, unit, remainingTokens } = extractQuantityAndUnit(tokens);
+  const cleanTokens = stripped.replace(/[.,;]/g, ' ').split(' ').filter(Boolean);
+  const { quantity, unit, remainingTokens } = extractQuantityAndUnit(cleanTokens);
   const itemName = extractItemName(remainingTokens);
 
   return {
@@ -213,3 +234,132 @@ export function parseVoiceCommand(
     raw,
   };
 }
+
+/**
+ * Splits a list of word tokens into separate items, recognizing compound terms
+ * (e.g. "ice cream", "sweet potato") and adjective modifiers (e.g. "organic apples").
+ */
+function splitUnpunctuatedItems(tokens: string[]): string[] {
+  const items: string[] = [];
+  let currentGroup: string[] = [];
+
+  let i = 0;
+  while (i < tokens.length) {
+    const token = tokens[i];
+
+    // Check 2-word compound match (e.g. "ice cream", "almond milk")
+    if (i + 1 < tokens.length) {
+      const twoWords = `${token} ${tokens[i + 1]}`;
+      if (KNOWN_COMPOUNDS.has(twoWords)) {
+        if (currentGroup.length > 0) {
+          items.push(currentGroup.join(' '));
+          currentGroup = [];
+        }
+        items.push(twoWords);
+        i += 2;
+        continue;
+      }
+    }
+
+    // Check if token is an adjective modifier (e.g. "organic", "fresh")
+    if (ADJECTIVE_MODIFIERS.has(token)) {
+      currentGroup.push(token);
+      i++;
+      continue;
+    }
+
+    // Check if token is a quantity or unit
+    const num = parseFloat(token);
+    if (!isNaN(num) || NUMBER_WORDS[token] !== undefined || UNIT_ALIASES[token]) {
+      if (currentGroup.length > 0) {
+        items.push(currentGroup.join(' '));
+        currentGroup = [];
+      }
+      currentGroup.push(token);
+      i++;
+      continue;
+    }
+
+    // Regular noun word (e.g. "table", "book", "mango", "banana")
+    currentGroup.push(token);
+    // If we have completed an item (modifiers + noun), push it
+    items.push(currentGroup.join(' '));
+    currentGroup = [];
+    i++;
+  }
+
+  if (currentGroup.length > 0) {
+    items.push(currentGroup.join(' '));
+  }
+
+  return items.filter(Boolean);
+}
+
+/**
+ * Parses a voice transcript that may contain multiple items separated by
+ * commas, "and", "or", or unpunctuated spoken lists (e.g. "add table book and chair").
+ *
+ * Returns one ParsedCommand per detected item so each is added separately.
+ */
+export function parseVoiceCommands(
+  raw: string,
+  language: SupportedLanguage = 'en-US'
+): ParsedCommand[] {
+  const normalized = normalizeText(raw);
+  const intent = detectIntent(normalized, language);
+
+  // CLEAR and SEARCH don't have multi-item variants — return single command
+  if (intent === 'CLEAR' || intent === 'SEARCH') {
+    return [parseVoiceCommand(raw, language)];
+  }
+
+  // Strip intent phrases (e.g. "add", "please put on my list")
+  const stripped = stripIntentPhrases(normalized, language);
+
+  // Step 1: Split on explicit delimiters: commas, semicolons, conjunctions
+  const rawParts = stripped
+    .split(/[,;\.]+|\s+(?:and|&|also|plus|with|then|और|तथा|एवं|व|y|e|et|und)\s+/i)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  // Step 2: For each part, check if it contains multiple unpunctuated words (e.g. "table book")
+  const subItems: string[] = [];
+  for (const part of rawParts) {
+    const cleanTokens = part.split(' ').map((t) => t.trim()).filter(Boolean);
+    
+    // If single word or already a known compound, keep as-is
+    if (cleanTokens.length <= 1 || KNOWN_COMPOUNDS.has(part)) {
+      subItems.push(part);
+    } else {
+      // Intelligently segment unpunctuated tokens
+      const segmented = splitUnpunctuatedItems(cleanTokens);
+      if (segmented.length > 0) {
+        subItems.push(...segmented);
+      } else {
+        subItems.push(part);
+      }
+    }
+  }
+
+  // If only 1 item resulted, return single parse
+  if (subItems.length <= 1) {
+    return [parseVoiceCommand(raw, language)];
+  }
+
+  // Build a ParsedCommand for each individual item
+  return subItems
+    .map((itemStr) => {
+      const tokens = itemStr.split(' ').filter(Boolean);
+      const { quantity, unit, remainingTokens } = extractQuantityAndUnit(tokens);
+      const itemName = extractItemName(remainingTokens);
+      return {
+        intent,
+        item: itemName || itemStr,
+        quantity,
+        unit,
+        raw: itemStr,
+      };
+    })
+    .filter((cmd) => Boolean(cmd.item && cmd.item.trim().length > 0));
+}
+

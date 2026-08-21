@@ -89,7 +89,8 @@ export type ShoppingListAction =
   | { type: 'TOGGLE_ITEM'; payload: { id: string } }
   | { type: 'UPDATE_QUANTITY'; payload: { id: string; quantity: number } }
   | { type: 'CLEAR_CHECKED' }
-  | { type: 'CLEAR_ALL' };
+  | { type: 'CLEAR_ALL' }
+  | { type: 'LOAD_ITEMS'; payload: ShoppingItem[] };
 
 // ─── History / Analytics ─────────────────────────────────────────────────
 

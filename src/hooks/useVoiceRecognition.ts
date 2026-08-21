@@ -54,10 +54,15 @@ export function useVoiceRecognition({
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const isListeningRef = useRef(false);
 
-  // Check browser support
-  const isSupported =
-    typeof window !== 'undefined' &&
-    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+  // Defer browser support check to client-side only.
+  // Starting with false ensures server and client render the same initial HTML,
+  // preventing React hydration mismatches.
+  const [isSupported, setIsSupported] = useState(false);
+  useEffect(() => {
+    setIsSupported(
+      'SpeechRecognition' in window || 'webkitSpeechRecognition' in window
+    );
+  }, []);
 
   const createRecognition = useCallback((): SpeechRecognition | null => {
     if (!isSupported) return null;
@@ -107,17 +112,45 @@ export function useVoiceRecognition({
           voiceState: 'processing' as VoiceState,
         }));
         onResult(finalTranscript.trim());
+        // Reset back to idle after showing "Processing..." briefly
+        setTimeout(() => {
+          setState((prev) => ({
+            ...prev,
+            voiceState: 'idle' as VoiceState,
+            transcript: '',
+          }));
+        }, 1500);
       }
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       isListeningRef.current = false;
+      
+      // 'aborted' is intentional (e.g. stop clicked or re-initialized)
+      if (event.error === 'aborted') {
+        setState((prev) => ({
+          ...prev,
+          voiceState: 'idle' as VoiceState,
+          error: null,
+        }));
+        return;
+      }
+
+      // 'no-speech' is a normal transient pause — auto-recover to idle
+      if (event.error === 'no-speech') {
+        setState((prev) => ({
+          ...prev,
+          voiceState: 'idle' as VoiceState,
+          error: null,
+          interimTranscript: '',
+        }));
+        return;
+      }
+
       const errorMessages: Record<string, string> = {
         'not-allowed':      'Microphone permission denied. Please allow mic access.',
-        'no-speech':        'No speech detected. Please try again.',
         'network':          'Network error. Check your connection.',
         'audio-capture':    'No microphone found.',
-        'aborted':          '',
       };
       const msg = errorMessages[event.error] ?? `Error: ${event.error}`;
       setState((prev) => ({
@@ -125,13 +158,22 @@ export function useVoiceRecognition({
         voiceState: 'error' as VoiceState,
         error: msg,
       }));
+
+      // Auto-clear transient errors after 3 seconds
+      setTimeout(() => {
+        setState((prev) => ({
+          ...prev,
+          voiceState: prev.voiceState === 'error' ? 'idle' : prev.voiceState,
+          error: null,
+        }));
+      }, 3000);
     };
 
     recognition.onend = () => {
       isListeningRef.current = false;
       setState((prev) => ({
         ...prev,
-        voiceState: prev.voiceState === 'processing' ? 'processing' : 'idle',
+        voiceState: prev.voiceState === 'processing' ? 'processing' : prev.voiceState === 'error' ? 'error' : 'idle',
         interimTranscript: '',
       }));
     };
@@ -160,12 +202,20 @@ export function useVoiceRecognition({
     if (isListeningRef.current) return;
 
     try {
-      if (!recognitionRef.current) {
-        recognitionRef.current = createRecognition();
+      // Create fresh instance to avoid "already started" or stale state issues
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch { /* ignore */ }
       }
-      recognitionRef.current?.start();
+      const fresh = createRecognition();
+      recognitionRef.current = fresh;
+      fresh?.start();
     } catch (err) {
       console.error('Failed to start voice recognition:', err);
+      setState((prev) => ({
+        ...prev,
+        voiceState: 'error',
+        error: 'Could not access microphone.',
+      }));
     }
   }, [isSupported, createRecognition]);
 

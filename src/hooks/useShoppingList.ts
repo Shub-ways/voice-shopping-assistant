@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useReducer } from 'react';
+import { useCallback, useEffect, useReducer, useState } from 'react';
 import {
   ShoppingItem,
   ShoppingListAction,
@@ -74,6 +74,10 @@ function shoppingListReducer(
     case 'CLEAR_ALL':
       return [];
 
+    case 'LOAD_ITEMS':
+      // Replace entire state with persisted items (called once on mount)
+      return action.payload;
+
     default:
       return state;
   }
@@ -82,24 +86,36 @@ function shoppingListReducer(
 // ─── Hook ──────────────────────────────────────────────────────────────────
 
 export function useShoppingList() {
-  const [items, dispatch] = useReducer(shoppingListReducer, [], (): ShoppingItem[] => {
-    if (typeof window === 'undefined') return [];
+  // Always initialize with [] so server and client render the same HTML.
+  // localStorage is read in a useEffect (client-only) to avoid hydration mismatch.
+  const [items, dispatch] = useReducer(shoppingListReducer, []);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Load persisted list from localStorage after first client render
+  useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? (JSON.parse(raw) as ShoppingItem[]) : [];
+      if (raw) {
+        const saved = JSON.parse(raw) as ShoppingItem[];
+        if (saved.length > 0) {
+          dispatch({ type: 'LOAD_ITEMS', payload: saved });
+        }
+      }
     } catch {
-      return [];
+      // Ignore parse errors
     }
-  });
+    setHydrated(true);
+  }, []);
 
-  // Persist to localStorage on every change
+  // Persist to localStorage whenever list changes (but not before hydration)
   useEffect(() => {
+    if (!hydrated) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     } catch {
       // Silently handle storage quota errors
     }
-  }, [items]);
+  }, [items, hydrated]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
