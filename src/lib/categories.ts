@@ -60,17 +60,23 @@ const CATEGORY_MAP: Record<ItemCategory, string[]> = {
 
 // ─── Public API ───────────────────────────────────────────────────────────
 
-/**
- * Returns the best-matching category for a given item name.
- * Runs a simple substring match against the keyword map.
- */
 export function categorizeItem(itemName: string): ItemCategory {
-  const lower = itemName.toLowerCase();
+  const lower = itemName.toLowerCase().trim();
+  const words = lower.split(/\s+/);
 
   for (const [category, keywords] of Object.entries(CATEGORY_MAP) as [ItemCategory, string[]][]) {
     if (category === 'other') continue;
-    if (keywords.some((kw) => lower.includes(kw) || kw.includes(lower))) {
-      return category;
+    for (const kw of keywords) {
+      // 1. Exact match
+      if (lower === kw) return category;
+
+      // 2. Multi-word keyword (e.g. "almond milk" in "unsweetened almond milk")
+      if (kw.includes(' ') && lower.includes(kw)) return category;
+
+      // 3. Whole-word match or plural/stem match (e.g. "apples" -> "apple")
+      if (words.some((w) => w === kw || (w.startsWith(kw) && kw.length >= 3) || (kw.startsWith(w) && w.length >= 4))) {
+        return category;
+      }
     }
   }
 

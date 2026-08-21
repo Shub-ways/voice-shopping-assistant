@@ -34,8 +34,10 @@ const NUMBER_WORDS: Record<string, number> = {
 // ─── Noise words to strip from item names ─────────────────────────────────
 
 const NOISE_WORDS = new Set([
-  'please', 'now', 'quickly', 'the', 'some', 'my', 'our', 'a', 'an',
-  'list', 'cart', 'items', 'item', 'grocery',
+  'please', 'now', 'quickly', 'the', 'some', 'any', 'my', 'our', 'a', 'an',
+  'list', 'cart', 'items', 'item', 'grocery', 'and', 'or', 'also', 'too',
+  'then', 'with', 'plus', 'of', 'to', 'in', 'on', 'at', 'for', 'from',
+  'as', 'well', 'buy', 'add', 'get', 'need', 'want',
 ]);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -280,6 +282,16 @@ function splitUnpunctuatedItems(tokens: string[]): string[] {
       continue;
     }
 
+    // Skip noise/connector words
+    if (NOISE_WORDS.has(token)) {
+      if (currentGroup.length > 0) {
+        items.push(currentGroup.join(' '));
+        currentGroup = [];
+      }
+      i++;
+      continue;
+    }
+
     // Regular noun word (e.g. "table", "book", "mango", "banana")
     currentGroup.push(token);
     // If we have completed an item (modifiers + noun), push it
@@ -292,7 +304,7 @@ function splitUnpunctuatedItems(tokens: string[]): string[] {
     items.push(currentGroup.join(' '));
   }
 
-  return items.filter(Boolean);
+  return items.filter((item) => item.trim().length > 0 && !NOISE_WORDS.has(item.trim().toLowerCase()));
 }
 
 /**
@@ -327,15 +339,17 @@ export function parseVoiceCommands(
   for (const part of rawParts) {
     const cleanTokens = part.split(' ').map((t) => t.trim()).filter(Boolean);
     
-    // If single word or already a known compound, keep as-is
+    // If single word or already a known compound, keep as-is if not a noise word
     if (cleanTokens.length <= 1 || KNOWN_COMPOUNDS.has(part)) {
-      subItems.push(part);
+      if (!NOISE_WORDS.has(part.toLowerCase())) {
+        subItems.push(part);
+      }
     } else {
       // Intelligently segment unpunctuated tokens
       const segmented = splitUnpunctuatedItems(cleanTokens);
       if (segmented.length > 0) {
         subItems.push(...segmented);
-      } else {
+      } else if (!NOISE_WORDS.has(part.toLowerCase())) {
         subItems.push(part);
       }
     }
@@ -360,6 +374,6 @@ export function parseVoiceCommands(
         raw: itemStr,
       };
     })
-    .filter((cmd) => Boolean(cmd.item && cmd.item.trim().length > 0));
+    .filter((cmd) => Boolean(cmd.item && cmd.item.trim().length > 0 && !NOISE_WORDS.has(cmd.item.trim().toLowerCase())));
 }
 
