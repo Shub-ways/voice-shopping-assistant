@@ -61,9 +61,9 @@ export function ShoppingItemCard({
         >
           {item.name}
         </p>
-        {item.note && (
-          <p className="text-xs text-[#607168] truncate">{item.note}</p>
-        )}
+        <p className="text-xs text-[#607168] truncate">
+          ${item.price.toFixed(2)}{item.note ? ` · ${item.note}` : ''}
+        </p>
       </div>
 
       {/* Quantity controls */}

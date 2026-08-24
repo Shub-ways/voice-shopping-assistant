@@ -23,6 +23,8 @@ export interface ShoppingItem {
   checked: boolean;
   addedAt: number;
   note?: string;
+  /** Estimated unit price (USD) — no product catalog exists, so this is derived locally. */
+  price: number;
 }
 
 // ─── NLP / Voice Types ────────────────────────────────────────────────────
@@ -85,7 +87,7 @@ export interface VoiceRecognitionState {
 // ─── Shopping List Actions ────────────────────────────────────────────────
 
 export type ShoppingListAction =
-  | { type: 'ADD_ITEM'; payload: Omit<ShoppingItem, 'id' | 'addedAt' | 'checked'> }
+  | { type: 'ADD_ITEM'; payload: Omit<ShoppingItem, 'id' | 'addedAt' | 'checked' | 'price'> }
   | { type: 'REMOVE_ITEM'; payload: { id: string } }
   | { type: 'TOGGLE_ITEM'; payload: { id: string } }
   | { type: 'UPDATE_QUANTITY'; payload: { id: string; quantity: number } }

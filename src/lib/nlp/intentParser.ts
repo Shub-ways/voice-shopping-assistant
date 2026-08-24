@@ -231,7 +231,12 @@ export function parseVoiceCommand(
     const filters = extractSearchFilters(normalized);
     const stripped = stripIntentPhrases(normalized, language);
     const cleanQuery = stripped.replace(/under .+/i, '').replace(/below .+/i, '').trim();
-    return { intent: 'SEARCH', searchQuery: cleanQuery || normalized, maxPrice, filters, raw };
+    // A price/attribute filter with no leftover item name is a valid
+    // "filter only" search (e.g. "find under $3") — don't fall back to the
+    // raw phrase in that case, only when nothing was extracted at all.
+    const hasFilterCriteria = maxPrice !== undefined || filters.length > 0;
+    const searchQuery = cleanQuery || (hasFilterCriteria ? '' : normalized);
+    return { intent: 'SEARCH', searchQuery, maxPrice, filters, raw };
   }
 
   // For ADD / REMOVE / CHECK / UNCHECK / UNKNOWN

@@ -7,6 +7,7 @@ import {
   ItemCategory,
 } from '@/types';
 import { categorizeItem, normalizeProductName } from '@/lib/categories';
+import { estimatePrice } from '@/lib/pricing';
 import { recordItemAdded } from '@/lib/suggestions/historyEngine';
 import { encodeUtf8Base64 } from '@/lib/share';
 
@@ -38,15 +39,17 @@ function shoppingListReducer(
         );
       }
 
+      const resolvedCategory = category ?? categorizeItem(normalizedName);
       const newItem: ShoppingItem = {
         id:       `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         name:     normalizedName,
         quantity,
         unit,
-          category: category ?? categorizeItem(normalizedName),
+        category: resolvedCategory,
         checked:  false,
         addedAt:  Date.now(),
         note,
+        price:    estimatePrice(normalizedName, resolvedCategory),
       };
 
       return [...state, newItem];
@@ -85,7 +88,13 @@ function shoppingListReducer(
           existing.checked = existing.checked && item.checked;
           return loadedItems;
         }
-        loadedItems.push({ ...item, name, category: categorizeItem(name) });
+        const category = categorizeItem(name);
+        loadedItems.push({
+          ...item,
+          name,
+          category,
+          price: item.price ?? estimatePrice(name, category),
+        });
         return loadedItems;
       }, []);
 

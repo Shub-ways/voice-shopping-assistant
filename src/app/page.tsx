@@ -29,6 +29,8 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<'list' | 'log'>('list');
   const [typedCommand, setTypedCommand] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchMaxPrice, setSearchMaxPrice] = useState<number | undefined>(undefined);
+  const [searchTags, setSearchTags] = useState<string[]>([]);
   const [lastAction, setLastAction] = useState('Ready when you are');
   const [pendingCommand, setPendingCommand] = useState<ParsedCommand | null>(null);
 
@@ -59,6 +61,18 @@ export default function Home() {
     ];
     return all.filter((s) => !dismissedSuggestions.has(s.id)).slice(0, 6);
   }, [items, dismissedSuggestions, mounted]);
+
+  // ── List filter: name query + estimated price ceiling + attribute tags ────
+
+  const filteredItems = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+    return items.filter((item) => {
+      if (query && !item.name.includes(query)) return false;
+      if (searchMaxPrice !== undefined && item.price > searchMaxPrice) return false;
+      if (searchTags.length > 0 && !searchTags.every((tag) => item.name.includes(tag))) return false;
+      return true;
+    });
+  }, [items, searchQuery, searchMaxPrice, searchTags]);
 
   // ── Voice command handler ─────────────────────────────────────────────────
 
@@ -118,11 +132,16 @@ export default function Home() {
           setLastAction('List cleared');
           break;
 
-        case 'SEARCH':
+        case 'SEARCH': {
           setSearchQuery(command.searchQuery ?? '');
+          setSearchMaxPrice(command.maxPrice);
+          setSearchTags(command.filters ?? []);
           setActiveTab('list');
-          setLastAction(`Searching for ${command.searchQuery || 'items'}`);
+          const priceNote = command.maxPrice !== undefined ? ` under $${command.maxPrice}` : '';
+          const tagNote = command.filters?.length ? ` (${command.filters.join(', ')})` : '';
+          setLastAction(`Searching for ${command.searchQuery || 'items'}${priceNote}${tagNote}`);
           break;
+        }
 
         default:
           // UNKNOWN — try treating as ADD if item name detected
@@ -329,9 +348,41 @@ export default function Home() {
           </div>
           <label className="relative sm:w-64">
             <Search className="absolute left-3 top-3 w-4 h-4 text-[#607168]" />
-            <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Filter your list" className="w-full rounded-xl border border-[#d7dfd4] bg-white pl-9 pr-4 py-2.5 text-sm outline-none focus:border-[#ff7043]" aria-label="Filter shopping list" />
+            <input
+              value={searchQuery}
+              onChange={(event) => {
+                setSearchQuery(event.target.value);
+                setSearchMaxPrice(undefined);
+                setSearchTags([]);
+              }}
+              placeholder="Filter your list"
+              className="w-full rounded-xl border border-[#d7dfd4] bg-white pl-9 pr-4 py-2.5 text-sm outline-none focus:border-[#ff7043]"
+              aria-label="Filter shopping list"
+            />
           </label>
         </div>
+
+        {/* ── Active price/attribute filters ───────────────────────────── */}
+        {(searchMaxPrice !== undefined || searchTags.length > 0) && (
+          <div className="flex flex-wrap items-center gap-2 -mt-4">
+            {searchMaxPrice !== undefined && (
+              <span className="rounded-full bg-[#e8f3e7] border border-[#c8dfc6] text-[#39734a] text-xs font-bold px-3 py-1">
+                Under ${searchMaxPrice}
+              </span>
+            )}
+            {searchTags.map((tag) => (
+              <span key={tag} className="rounded-full bg-[#e8f3e7] border border-[#c8dfc6] text-[#39734a] text-xs font-bold px-3 py-1 capitalize">
+                {tag}
+              </span>
+            ))}
+            <button
+              onClick={() => { setSearchMaxPrice(undefined); setSearchTags([]); }}
+              className="text-xs font-bold text-[#607168] hover:text-[#18221d] underline"
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
 
         {/* ── Main content ──────────────────────────────────────────────── */}
         <section className="flex-1" aria-label={activeTab === 'list' ? 'Shopping list' : 'Voice command log'}>
@@ -344,7 +395,7 @@ export default function Home() {
                 exit={{ opacity: 0, x: 10 }}
               >
                 <ShoppingList
-                  items={items.filter((item) => item.name.includes(searchQuery.toLowerCase().trim()))}
+                  items={filteredItems}
                   onToggle={toggleItem}
                   onRemove={removeItem}
                   onQuantityChange={updateQuantity}
@@ -362,18 +413,18 @@ export default function Home() {
               >
                 {commandLog.length === 0 ? (
                   <div className="flex flex-col items-center gap-3 py-12 text-center">
-                    <History className="w-10 h-10 text-slate-700" />
-                    <p className="text-slate-500 text-sm">No commands yet</p>
+                    <History className="w-10 h-10 text-[#a9b5a3]" />
+                    <p className="text-[#607168] text-sm">No commands yet</p>
                   </div>
                 ) : (
                   commandLog.map((entry) => (
                     <div
                       key={entry.id}
-                      className="flex items-center gap-3 px-4 py-2.5 bg-white/5 rounded-xl border border-white/5"
+                      className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-xl border border-[#d7dfd4]"
                     >
-                      <Mic2 className="w-3.5 h-3.5 text-violet-400 flex-shrink-0" />
-                      <p className="text-sm text-slate-300 italic flex-1">&ldquo;{entry.text}&rdquo;</p>
-                      <span className="text-xs text-slate-600 flex-shrink-0">
+                      <Mic2 className="w-3.5 h-3.5 text-[#7c5cff] flex-shrink-0" />
+                      <p className="text-sm text-[#18221d] italic flex-1">&ldquo;{entry.text}&rdquo;</p>
+                      <span className="text-xs text-[#607168] flex-shrink-0">
                         {new Date(entry.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
