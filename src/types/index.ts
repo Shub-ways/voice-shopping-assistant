@@ -44,6 +44,7 @@ export interface ParsedCommand {
   searchQuery?: string;
   maxPrice?: number;
   filters?: string[];
+  confidence?: number;
   raw: string;
 }
 

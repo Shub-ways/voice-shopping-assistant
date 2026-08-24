@@ -58,10 +58,50 @@ const CATEGORY_MAP: Record<ItemCategory, string[]> = {
   other: [],
 };
 
+const PRODUCT_ALIASES: Record<string, string> = {
+  // Hindi
+  'दूध': 'milk',
+  'मिल्क': 'milk',
+  'पानी': 'water',
+  'वॉटर': 'water',
+  'सेब': 'apple',
+  'एप्पल': 'apple',
+  'केला': 'banana',
+  'केले': 'banana',
+  'केलों': 'banana',
+  'बनाना': 'banana',
+  'अंडे': 'eggs',
+  'अंडा': 'egg',
+  'ब्रेड': 'bread',
+  'चावल': 'rice',
+  'किताब': 'book',
+  'किताबें': 'books',
+  'किताबों': 'books',
+  // Spanish
+  'leche': 'milk',
+  'agua': 'water',
+  'manzana': 'apple',
+  'plátano': 'banana',
+  // French
+  'lait': 'milk',
+  'eau': 'water',
+  'pomme': 'apple',
+  'banane': 'banana',
+  // German
+  'milch': 'milk',
+  'wasser': 'water',
+  'apfel': 'apple',
+};
+
+export function normalizeProductName(itemName: string): string {
+  const normalized = itemName.toLowerCase().trim();
+  return PRODUCT_ALIASES[normalized] ?? normalized;
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────
 
 export function categorizeItem(itemName: string): ItemCategory {
-  const lower = itemName.toLowerCase().trim();
+  const lower = normalizeProductName(itemName);
   const words = lower.split(/\s+/);
 
   for (const [category, keywords] of Object.entries(CATEGORY_MAP) as [ItemCategory, string[]][]) {

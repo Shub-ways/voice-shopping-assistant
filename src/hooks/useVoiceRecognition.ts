@@ -59,6 +59,8 @@ export function useVoiceRecognition({
   // preventing React hydration mismatches.
   const [isSupported, setIsSupported] = useState(false);
   useEffect(() => {
+    // Browser capability is only available after the client mounts.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsSupported(
       'SpeechRecognition' in window || 'webkitSpeechRecognition' in window
     );
@@ -149,7 +151,7 @@ export function useVoiceRecognition({
 
       const errorMessages: Record<string, string> = {
         'not-allowed':      'Microphone permission denied. Please allow mic access.',
-        'network':          'Network error. Check your connection.',
+        'network':          'Browser speech service is unavailable. Try again or type the command below.',
         'audio-capture':    'No microphone found.',
       };
       const msg = errorMessages[event.error] ?? `Error: ${event.error}`;

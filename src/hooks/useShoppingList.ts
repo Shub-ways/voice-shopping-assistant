@@ -6,8 +6,9 @@ import {
   ShoppingListAction,
   ItemCategory,
 } from '@/types';
-import { categorizeItem } from '@/lib/categories';
+import { categorizeItem, normalizeProductName } from '@/lib/categories';
 import { recordItemAdded } from '@/lib/suggestions/historyEngine';
+import { encodeUtf8Base64 } from '@/lib/share';
 
 // ─── Persistence key ───────────────────────────────────────────────────────
 
@@ -22,7 +23,7 @@ function shoppingListReducer(
   switch (action.type) {
     case 'ADD_ITEM': {
       const { name, quantity, unit, category, note } = action.payload;
-      const normalizedName = name.toLowerCase().trim();
+      const normalizedName = normalizeProductName(name);
 
       // If item already exists, increase quantity instead of duplicating
       const existingIndex = state.findIndex(
@@ -42,7 +43,7 @@ function shoppingListReducer(
         name:     normalizedName,
         quantity,
         unit,
-        category: category ?? categorizeItem(normalizedName),
+          category: category ?? categorizeItem(normalizedName),
         checked:  false,
         addedAt:  Date.now(),
         note,
@@ -76,7 +77,17 @@ function shoppingListReducer(
 
     case 'LOAD_ITEMS':
       // Replace entire state with persisted items (called once on mount)
-      return action.payload;
+      return action.payload.reduce<ShoppingItem[]>((loadedItems, item) => {
+        const name = normalizeProductName(item.name);
+        const existing = loadedItems.find((loadedItem) => loadedItem.name === name);
+        if (existing) {
+          existing.quantity += item.quantity;
+          existing.checked = existing.checked && item.checked;
+          return loadedItems;
+        }
+        loadedItems.push({ ...item, name, category: categorizeItem(name) });
+        return loadedItems;
+      }, []);
 
     default:
       return state;
@@ -104,6 +115,8 @@ export function useShoppingList() {
     } catch {
       // Ignore parse errors
     }
+    // Browser storage must be loaded after hydration to keep server markup stable.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHydrated(true);
   }, []);
 
@@ -130,14 +143,14 @@ export function useShoppingList() {
       dispatch({
         type: 'ADD_ITEM',
         payload: {
-          name,
+          name: normalizeProductName(name),
           quantity,
           unit,
-          category: category ?? categorizeItem(name),
+          category: category ?? categorizeItem(normalizeProductName(name)),
           note,
         },
       });
-      recordItemAdded(name); // update suggestion history
+      recordItemAdded(normalizeProductName(name)); // update suggestion history
     },
     []
   );
@@ -147,10 +160,18 @@ export function useShoppingList() {
   }, []);
 
   const removeItemByName = useCallback(
-    (name: string) => {
-      const normalized = name.toLowerCase().trim();
+    (name: string, quantity = 1) => {
+      const normalized = normalizeProductName(name);
       const item = items.find((i) => i.name.toLowerCase().includes(normalized));
-      if (item) dispatch({ type: 'REMOVE_ITEM', payload: { id: item.id } });
+      if (!item) return;
+      if (item.quantity > quantity) {
+        dispatch({
+          type: 'UPDATE_QUANTITY',
+          payload: { id: item.id, quantity: item.quantity - quantity },
+        });
+      } else {
+        dispatch({ type: 'REMOVE_ITEM', payload: { id: item.id } });
+      }
     },
     [items]
   );
@@ -183,7 +204,7 @@ export function useShoppingList() {
   const getShareableUrl = useCallback(() => {
     if (typeof window === 'undefined') return '';
     const payload = items.map((i) => `${i.name}:${i.quantity}`).join(',');
-    const encoded = encodeURIComponent(btoa(payload));
+    const encoded = encodeURIComponent(encodeUtf8Base64(payload));
     return `${window.location.origin}?list=${encoded}`;
   }, [items]);
 

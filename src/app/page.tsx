@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, Mic2, History, Trash2 } from 'lucide-react';
+import { ShoppingCart, Mic2, History, Trash2, Search, Plus, CircleCheck } from 'lucide-react';
 import { useShoppingList } from '@/hooks/useShoppingList';
 import { VoiceInput } from '@/components/VoiceInput';
 import { ShoppingList } from '@/components/ShoppingList';
@@ -14,22 +14,27 @@ import { getSeasonalSuggestions } from '@/lib/suggestions/seasonalEngine';
 import { getSubstituteSuggestions } from '@/lib/suggestions/substitutesDB';
 import { ParsedCommand, SupportedLanguage, Suggestion } from '@/types';
 import { DEFAULT_LANGUAGE } from '@/lib/i18n/languages';
+import { parseVoiceCommand } from '@/lib/nlp/intentParser';
+import { decodeUtf8Base64 } from '@/lib/share';
 
 export default function Home() {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false
+  );
   const [language, setLanguage] = useState<SupportedLanguage>(DEFAULT_LANGUAGE);
   const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
   const [commandLog, setCommandLog] = useState<{ id: string; text: string; ts: number }[]>([]);
   const [activeTab, setActiveTab] = useState<'list' | 'log'>('list');
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const [typedCommand, setTypedCommand] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [lastAction, setLastAction] = useState('Ready when you are');
+  const [pendingCommand, setPendingCommand] = useState<ParsedCommand | null>(null);
 
   const {
     items,
     uncheckedItems,
-    checkedItems,
     totalItems,
     checkedCount,
     addItem,
@@ -71,15 +76,28 @@ export default function Home() {
         ].slice(0, 20)
       );
 
+      if (
+        command.item &&
+        (command.intent === 'UNKNOWN' || (command.confidence !== undefined && command.confidence < 0.72))
+      ) {
+        setPendingCommand(command);
+        setLastAction(`I heard “${command.item}” — please confirm`);
+        return;
+      }
+
       switch (command.intent) {
         case 'ADD':
           if (command.item) {
             addItem(command.item, command.quantity ?? 1, command.unit);
+            setLastAction(`Added ${command.quantity && command.quantity > 1 ? `${command.quantity} ` : ''}${command.item}`);
           }
           break;
 
         case 'REMOVE':
-          if (command.item) removeItemByName(command.item);
+          if (command.item) {
+            removeItemByName(command.item, command.quantity ?? 1);
+            setLastAction(`Removed ${command.quantity && command.quantity > 1 ? `${command.quantity} ` : ''}${command.item}`);
+          }
           break;
 
         case 'CHECK': {
@@ -87,27 +105,55 @@ export default function Home() {
             const found = items.find((i) =>
               i.name.toLowerCase().includes(command.item!.toLowerCase())
             );
-            if (found) toggleItem(found.id);
+            if (found) {
+              toggleItem(found.id);
+              setLastAction(`Checked off ${found.name}`);
+            }
           }
           break;
         }
 
         case 'CLEAR':
           clearAll();
+          setLastAction('List cleared');
           break;
 
         case 'SEARCH':
-          // Surface a toast or highlight matching items
+          setSearchQuery(command.searchQuery ?? '');
+          setActiveTab('list');
+          setLastAction(`Searching for ${command.searchQuery || 'items'}`);
           break;
 
         default:
           // UNKNOWN — try treating as ADD if item name detected
-          if (command.item) addItem(command.item, 1);
+          if (command.item) {
+            addItem(command.item, 1);
+            setLastAction(`Added ${command.item}`);
+          }
           break;
       }
     },
     [addItem, removeItemByName, toggleItem, clearAll, items]
   );
+
+  const confirmPendingCommand = useCallback(() => {
+    if (!pendingCommand?.item) return;
+    addItem(pendingCommand.item, pendingCommand.quantity ?? 1, pendingCommand.unit);
+    setLastAction(`Added ${pendingCommand.item}`);
+    setPendingCommand(null);
+  }, [addItem, pendingCommand]);
+
+  const cancelPendingCommand = useCallback(() => {
+    setPendingCommand(null);
+    setLastAction('Command ignored');
+  }, []);
+
+  const submitTypedCommand = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!typedCommand.trim()) return;
+    handleCommand(parseVoiceCommand(typedCommand, language));
+    setTypedCommand('');
+  };
 
   // ── Accept a suggestion ───────────────────────────────────────────────────
 
@@ -132,7 +178,7 @@ export default function Home() {
     if (!encoded) return;
 
     try {
-      const decoded = atob(decodeURIComponent(encoded));
+      const decoded = decodeUtf8Base64(decodeURIComponent(encoded));
       const entries = decoded.split(',');
       entries.forEach((entry) => {
         const [name, qty] = entry.split(':');
@@ -145,20 +191,20 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-violet-950 text-white">
-      <div className="max-w-md mx-auto px-4 py-6 flex flex-col gap-6 min-h-screen">
+    <main className="min-h-screen bg-[#f6f3ec] text-[#18221d]">
+      <div className="max-w-5xl mx-auto px-4 sm:px-8 py-6 sm:py-10 flex flex-col gap-8 min-h-screen">
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-violet-600 rounded-xl">
-              <ShoppingCart className="w-5 h-5 text-white" />
+            <div className="p-2.5 bg-[#ff7043] rounded-2xl shadow-[4px_4px_0_#18221d]">
+              <ShoppingCart className="w-5 h-5 text-[#18221d]" />
             </div>
             <div>
-              <h1 className="text-base font-bold text-slate-100 leading-tight">
-                Voice Shopping
+              <h1 className="text-xl font-black tracking-tight leading-tight">
+                Say<span className="text-[#ff7043]">Cart</span>
               </h1>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-[#607168]">
                 {totalItems === 0
                   ? 'No items yet'
                   : `${uncheckedItems.length} item${uncheckedItems.length !== 1 ? 's' : ''} remaining`}
@@ -170,7 +216,7 @@ export default function Home() {
             {totalItems > 0 && (
               <button
                 onClick={clearAll}
-                className="p-1.5 rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-400/10 transition-all"
+                className="p-2 rounded-xl text-[#607168] hover:text-red-600 hover:bg-red-100 transition-all"
                 title="Clear all"
               >
                 <Trash2 className="w-4 h-4" />
@@ -180,27 +226,66 @@ export default function Home() {
         </header>
 
         {/* ── Language selector ─────────────────────────────────────────── */}
-        <LanguageSelector current={language} onChange={setLanguage} />
+        <div className="grid lg:grid-cols-[1.05fr_0.95fr] gap-8 items-start">
+          <section className="bg-[#18352d] text-[#f6f3ec] rounded-[2rem] p-6 sm:p-10 min-h-[390px] flex flex-col justify-between overflow-hidden relative shadow-[8px_8px_0_#c8d7c6]" aria-label="Voice input">
+            <div className="relative z-10 flex flex-col gap-2">
+              <p className="text-xs uppercase tracking-[0.2em] text-[#a6c9a5] font-bold">Hands-free grocery run</p>
+              <h2 className="text-4xl sm:text-5xl font-black tracking-tight max-w-md">What should we pick up?</h2>
+              <p className="text-[#c8d7c6] max-w-sm">Speak naturally. Say a quantity, remove an item, or ask me to find something on your list.</p>
+            </div>
+            <div className="relative z-10 flex flex-col items-center gap-3 pt-8">
+              <VoiceInput language={language} onCommand={handleCommand} />
+              <p className="text-sm text-[#a6c9a5]">{lastAction}</p>
+            </div>
+            <div className="absolute -right-20 -bottom-24 w-64 h-64 rounded-full border-[34px] border-[#ff7043]/80" />
+          </section>
 
-        {/* ── Voice input ───────────────────────────────────────────────── */}
-        <section
-          aria-label="Voice input"
-          className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-2"
-        >
-          <VoiceInput language={language} onCommand={handleCommand} />
+          <section className="bg-white rounded-[2rem] border border-[#d7dfd4] p-6 sm:p-8 shadow-[0_12px_30px_rgba(24,34,29,0.06)]">
+            <div className="flex items-center justify-between gap-4 mb-5">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-[#607168] font-bold">Quick add</p>
+                <h2 className="text-2xl font-black tracking-tight">Type it your way</h2>
+              </div>
+              <Plus className="text-[#ff7043]" />
+            </div>
+            <form onSubmit={submitTypedCommand} className="flex gap-2">
+              <input value={typedCommand} onChange={(event) => setTypedCommand(event.target.value)} placeholder="e.g. add 2 bottles of water" className="min-w-0 flex-1 rounded-xl border border-[#d7dfd4] bg-[#f6f3ec] px-4 py-3 text-sm outline-none focus:border-[#ff7043] focus:ring-2 focus:ring-[#ff7043]/20" aria-label="Type a shopping command" />
+              <button type="submit" className="rounded-xl bg-[#ff7043] px-4 font-bold hover:bg-[#f25b31] transition-colors" aria-label="Add typed command">Go</button>
+            </form>
+            <div className="flex flex-wrap gap-2 mt-5">
+              {['Add oat milk', 'Buy 3 apples', 'Find organic items'].map((hint) => (
+                <button key={hint} onClick={() => setTypedCommand(hint)} className="rounded-full border border-[#d7dfd4] px-3 py-1.5 text-xs text-[#607168] hover:border-[#ff7043] hover:text-[#18221d] transition-colors">{hint}</button>
+              ))}
+            </div>
+            <div className="mt-8 pt-5 border-t border-[#edf0e9]">
+              <LanguageSelector current={language} onChange={setLanguage} />
+            </div>
+          </section>
+        </div>
 
-          {/* Quick hint phrases */}
-          <div className="flex flex-wrap gap-1.5 justify-center mt-2">
-            {['"Add milk"', '"Remove bread"', '"I need 3 apples"', '"Clear list"'].map((hint) => (
-              <span
-                key={hint}
-                className="text-xs text-slate-600 bg-white/5 rounded-full px-2.5 py-1"
-              >
-                {hint}
-              </span>
-            ))}
-          </div>
-        </section>
+        <AnimatePresence>
+          {pendingCommand?.item && (
+            <motion.section
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-[#f1c48e] bg-[#fff7e8] px-5 py-4"
+              aria-label="Confirm voice command"
+            >
+              <div>
+                <p className="text-xs uppercase tracking-[0.16em] font-bold text-[#a25c16]">Needs a quick check</p>
+                <p className="font-bold text-[#18352d]">
+                  Add {pendingCommand.quantity && pendingCommand.quantity > 1 ? `${pendingCommand.quantity} ` : ''}{pendingCommand.item}?
+                </p>
+                <p className="text-xs text-[#607168] mt-1">The phrase was unclear, so nothing has been added yet.</p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button onClick={cancelPendingCommand} className="rounded-xl border border-[#d7dfd4] bg-white px-4 py-2 text-sm font-bold text-[#607168] hover:text-[#18352d]">Try again</button>
+                <button onClick={confirmPendingCommand} className="rounded-xl bg-[#18352d] px-4 py-2 text-sm font-bold text-white hover:bg-[#245344]">Add it</button>
+              </div>
+            </motion.section>
+          )}
+        </AnimatePresence>
 
         {/* ── Smart suggestions ─────────────────────────────────────────── */}
         <AnimatePresence>
@@ -222,15 +307,16 @@ export default function Home() {
         </AnimatePresence>
 
         {/* ── Tabs: List / Command Log ──────────────────────────────────── */}
-        <div className="flex gap-1 bg-white/5 rounded-xl p-1">
+        <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center">
+          <div className="flex gap-1 bg-white rounded-xl border border-[#d7dfd4] p-1 flex-1">
           {(['list', 'log'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all ${
                 activeTab === tab
-                  ? 'bg-white/10 text-slate-100 shadow'
-                  : 'text-slate-500 hover:text-slate-300'
+                  ? 'bg-[#18352d] text-white shadow'
+                  : 'text-[#607168] hover:text-[#18221d]'
               }`}
             >
               {tab === 'list' ? (
@@ -240,6 +326,11 @@ export default function Home() {
               )}
             </button>
           ))}
+          </div>
+          <label className="relative sm:w-64">
+            <Search className="absolute left-3 top-3 w-4 h-4 text-[#607168]" />
+            <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Filter your list" className="w-full rounded-xl border border-[#d7dfd4] bg-white pl-9 pr-4 py-2.5 text-sm outline-none focus:border-[#ff7043]" aria-label="Filter shopping list" />
+          </label>
         </div>
 
         {/* ── Main content ──────────────────────────────────────────────── */}
@@ -253,7 +344,7 @@ export default function Home() {
                 exit={{ opacity: 0, x: 10 }}
               >
                 <ShoppingList
-                  items={items}
+                  items={items.filter((item) => item.name.includes(searchQuery.toLowerCase().trim()))}
                   onToggle={toggleItem}
                   onRemove={removeItem}
                   onQuantityChange={updateQuantity}
@@ -294,8 +385,8 @@ export default function Home() {
         </section>
 
         {/* ── Footer ────────────────────────────────────────────────────── */}
-        <footer className="text-center text-xs text-slate-700 pb-2">
-          Voice Shopping Assistant · Built with Next.js
+        <footer className="flex items-center justify-center gap-2 text-xs text-[#607168] pb-2">
+          <CircleCheck className="w-4 h-4 text-[#5a9b68]" /> Saved locally · AI assist when online
         </footer>
       </div>
     </main>

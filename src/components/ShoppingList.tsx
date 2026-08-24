@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { ShoppingCart, Trash, CheckCheck } from 'lucide-react';
+import { ShoppingCart, CheckCheck } from 'lucide-react';
 import { ShoppingItem } from '@/types';
 import { ShoppingItemCard } from '@/components/ShoppingItemCard';
 import { groupByCategory, CATEGORY_LABELS } from '@/lib/categories';
@@ -53,7 +53,7 @@ export function ShoppingList({
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             onClick={onClearChecked}
-            className="flex items-center justify-center gap-2 w-full py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm hover:bg-emerald-500/20 transition-all"
+            className="flex items-center justify-center gap-2 w-full py-2 rounded-xl bg-[#e8f3e7] border border-[#c8dfc6] text-[#39734a] text-sm hover:bg-[#dceedd] transition-all"
           >
             <CheckCheck className="w-4 h-4" />
             Remove {checkedCount} checked item{checkedCount !== 1 ? 's' : ''}
@@ -65,11 +65,11 @@ export function ShoppingList({
       {Array.from(grouped.entries()).map(([category, categoryItems]) => (
         <div key={category} className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#607168]">
               {CATEGORY_LABELS[category]}
             </p>
-            <div className="flex-1 h-px bg-white/5" />
-            <span className="text-xs text-slate-600">{categoryItems.length}</span>
+            <div className="flex-1 h-px bg-[#d7dfd4]" />
+            <span className="text-xs text-[#607168]">{categoryItems.length}</span>
           </div>
 
           <AnimatePresence mode="popLayout">

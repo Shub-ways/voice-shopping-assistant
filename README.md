@@ -1,36 +1,187 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🛒 Voice Shopping Assistant
 
-## Getting Started
+A voice-powered shopping list manager with smart suggestions, multilingual support, and offline capability — built as a technical assessment project.
 
-First, run the development server:
+**Live Demo:** Deploy your fork to Vercel and add the resulting URL here before submitting.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## ✨ Features
+
+### Assessment approach
+SayCart is intentionally local-first: the browser-native Web Speech API handles recognition, while a typed command fallback keeps the core workflow testable when microphone permissions or browser support are unavailable. Both entry points use the same interpreter pipeline, so a command behaves consistently whether it is spoken or typed. The app stores the list and purchase history locally, avoiding account setup while still providing a realistic installable experience.
+
+### 🎙️ Voice Input
+- **Natural language commands**: "Add milk", "I need 3 bottles of water", "Remove bread from my list"
+- **Real-time waveform visualizer** using Web Audio API AnalyserNode (live mic data, not fake animation)
+- **Quantity parsing**: "Buy 5 oranges" → qty: 5, "Add two dozen eggs" → qty: 24
+- **Unit support**: kg, g, lb, litres, bottles, cans, packs, loaves…
+
+### 🌍 Multilingual Support
+| Language | Code | Trigger words |
+|----------|------|---------------|
+| English  | en-US | add, buy, remove, find… |
+| Hindi    | hi-IN | जोड़ो, खरीदो, हटाओ… |
+| Spanish  | es-ES | añadir, quitar, buscar… |
+| French   | fr-FR | ajouter, enlever, chercher… |
+| German   | de-DE | hinzufügen, entfernen, suchen… |
+
+### 🧠 Smart Suggestions
+Three independent suggestion layers:
+
+| Layer | Mechanism |
+|-------|-----------|
+| **History-based** | Frequency + recency weighted items from localStorage purchase history |
+| **Seasonal** | Month-aware produce + holiday-triggered items (within 7 days of event) |
+| **Substitutes** | 18+ product categories mapped to healthier/allergen-free/budget alternatives |
+
+### 📋 List Management
+- **Auto-categorization**: 12 categories (Dairy, Produce, Bakery, Meat, Frozen…)
+- **Smart dedup**: Adding an existing item increments quantity instead of creating a duplicate
+- **Bulk actions**: Clear checked items in one tap
+- **Voice command log**: Every recognized phrase is timestamped and logged
+- **Typed command fallback**: Run the same add, remove, check, clear, and search intents without a microphone
+- **Live list filter**: Search the current list by typing or saying "find ..."
+
+### 🔗 Shareable Lists
+Encode the full shopping list as a URL query parameter — anyone with the link can open it in their browser (no account needed).
+
+### 📱 Progressive Web App (PWA)
+- Installable on mobile (Add to Home Screen)
+- List works **offline** — localStorage-persisted items survive connectivity loss; Gemini interpretation and browser speech recognition require internet
+- Mobile-first, viewport-locked, optimized touch targets
+
+---
+
+## 🏗️ Architecture
+
+```
+src/
+├── app/                    # Next.js App Router
+│   ├── layout.tsx          # Root layout (PWA meta, font)
+│   └── page.tsx            # Main orchestration page
+├── components/
+│   ├── VoiceInput.tsx      # Mic button + transcript display
+│   ├── WaveformVisualizer  # Real-time audio bars (Web Audio API)
+│   ├── ShoppingList.tsx    # Category-grouped list container
+│   ├── ShoppingItemCard    # Individual item with quantity controls
+│   ├── SuggestionChips     # Smart suggestion pills
+│   ├── LanguageSelector    # 5-language switcher
+│   └── ShareButton.tsx     # Web Share API + copy link fallback
+├── hooks/
+│   ├── useVoiceRecognition # Web Speech API wrapper
+│   └── useShoppingList     # useReducer + localStorage persistence
+└── lib/
+    ├── nlp/intentParser    # Custom intent+entity extraction engine
+    ├── categories.ts       # Keyword-based item categorization
+    ├── suggestions/
+    │   ├── historyEngine   # Frequency/recency-weighted history
+    │   ├── seasonalEngine  # Month + holiday-based suggestions
+    │   └── substitutesDB   # Product alternative database
+    └── i18n/languages      # Language configs + keyword maps
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🧪 Technical Approach
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+> Built with Next.js 16, TypeScript, and Tailwind CSS. The app uses the browser-native Web Speech API for voice recognition — requiring no external API keys or costs — making it instantly deployable and free to use.
+>
+> The NLP layer is a custom intent parser built on pattern matching. It extracts intents (ADD/REMOVE/SEARCH/CHECK/CLEAR), entities (item names), and quantities from natural language phrases without relying on a cloud NLP service, keeping latency under 50ms and working completely offline.
+>
+> Smart suggestions are powered by a three-layer engine: a frequency-based history engine (items you buy most), a seasonal engine (current month's produce/holidays), and a substitutes database (common product alternatives). List data and history live in localStorage; the optional Gemini route is used only for broad-language interpretation.
+>
+> Multilingual support uses the Web Speech API's lang attribute across 5 languages with per-language intent keyword maps, enabling natural commands in English, Hindi, Spanish, French, and German.
+>
+> The app is a Progressive Web App — installable on mobile, keeps the shopping list available offline, and provides a native-like experience. Gemini interpretation and browser speech recognition use network services when enabled. Deployed on Vercel with automatic CI/CD from GitHub.
 
-## Learn More
+## 📝 Submission write-up (under 200 words)
 
-To learn more about Next.js, take a look at the following resources:
+SayCart is an offline-first voice shopping assistant built with Next.js, TypeScript, and browser-native speech APIs. Users can add, remove, check, and clear items with natural phrases such as "add two bottles of water" or "remove bread". A shared intent parser powers both voice input and the typed fallback, extracting quantities, units, search filters, and multilingual trigger words consistently. Items are automatically categorized, duplicate products increase quantity, and the command log makes recognition behavior visible.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Smart suggestions combine local purchase history, month-aware seasonal produce, and a substitute database. The list and history are stored in localStorage, so the app works without accounts, API keys, or a backend and remains usable offline after loading. A share action encodes a list into a URL for quick handoff. The interface is mobile-first, keyboard-accessible, and gives immediate feedback through transcripts, a live waveform, action status, loading states, and browser capability errors. This keeps the MVP deployable on Vercel while leaving clear extension points for a product catalog or server-backed recommendations.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 🚀 Getting Started
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+# Clone the repo
+git clone https://github.com/Shub-ways/voice-shopping-assistant.git
+cd voice-shopping-assistant
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in **Chrome or Edge** (required for Web Speech API).
+
+> ⚠️ **Important**: Voice recognition requires microphone permission and works in Chromium-based browsers. Safari has partial support; Firefox does not support the Web Speech API.
+
+### Optional broad-language interpreter
+
+For wider natural-language coverage, copy `.env.example` to `.env.local` and add a server-side Gemini key:
+
+```bash
+GEMINI_API_KEY=your_key_here
+```
+
+The voice flow sends only the transcript to `/api/interpret`. The key is never exposed to the browser. If the key is missing, the request fails, or the device is offline, SayCart automatically uses its local parser. The list itself remains available offline, while browser speech recognition may require an internet connection.
+
+Before submitting, run:
+
+```bash
+npm run lint
+npm run typecheck
+npm run build
+```
+
+---
+
+## 🛠️ Tech Stack
+
+| Technology | Purpose |
+|-----------|---------|
+| Next.js 16 (App Router) | Framework + SSR |
+| TypeScript | Type safety |
+| Tailwind CSS v4 | Styling |
+| Framer Motion | Animations |
+| Web Speech API | Voice recognition (free, browser-native) |
+| Web Audio API | Live waveform visualization |
+| localStorage | List + history persistence |
+| Vercel | Hosting + CI/CD |
+
+---
+
+## 📦 Deployment
+
+This project is deployed on **Vercel** with automatic deploys from the `main` branch.
+
+To deploy your own instance:
+1. Push to GitHub
+2. Import the repo at [vercel.com/new](https://vercel.com/new)
+3. Add `GEMINI_API_KEY` in Vercel project settings to enable broad-language interpretation. Without it, the local parser remains available.
+
+---
+
+## 🎯 Voice Command Examples
+
+| Say this | Action |
+|----------|--------|
+| "Add milk" | Adds milk (qty: 1) |
+| "Buy 3 apples" | Adds apples (qty: 3) |
+| "I need two bottles of water" | Adds water (qty: 2, unit: bottle) |
+| "Remove bread from my list" | Removes bread |
+| "I got the eggs" | Checks off eggs |
+| "Clear my list" | Clears everything |
+| "जोड़ो दूध" | Adds milk (Hindi) |
+| "Añadir manzanas" | Adds apples (Spanish) |
+
+---
+
+## 📄 License
+
+MIT — free to use and modify.

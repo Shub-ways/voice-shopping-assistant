@@ -18,9 +18,9 @@ const SOURCE_COLORS = {
 };
 
 const SOURCE_BADGE = {
-  history:   { label: 'Often bought', color: 'text-violet-400' },
-  seasonal:  { label: 'Seasonal',     color: 'text-emerald-400' },
-  substitute:{ label: 'Substitute',   color: 'text-amber-400' },
+  history:   { label: 'Often bought', color: 'text-[#7652a8]' },
+  seasonal:  { label: 'Seasonal',     color: 'text-[#39734a]' },
+  substitute:{ label: 'Substitute',   color: 'text-[#a25c16]' },
 };
 
 export function SuggestionChips({
@@ -63,7 +63,7 @@ export function SuggestionChips({
               {/* Item name — clicking it adds to list */}
               <button
                 onClick={() => onAccept(suggestion)}
-                className="text-slate-200 font-medium capitalize hover:text-white transition-colors"
+                className="text-[#18352d] font-semibold capitalize hover:text-[#ff7043] transition-colors"
               >
                 {suggestion.name}
               </button>
@@ -77,7 +77,7 @@ export function SuggestionChips({
               <button
                 onClick={() => onDismiss(suggestion.id)}
                 aria-label="Dismiss suggestion"
-                className="p-0.5 rounded-full text-slate-500 hover:text-slate-200 hover:bg-white/10 transition-all ml-1"
+                className="p-0.5 rounded-full text-[#607168] hover:text-[#18352d] hover:bg-black/5 transition-all ml-1"
               >
                 <X className="w-3 h-3" />
               </button>

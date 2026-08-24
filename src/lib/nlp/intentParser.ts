@@ -37,7 +37,7 @@ const NOISE_WORDS = new Set([
   'please', 'now', 'quickly', 'the', 'some', 'any', 'my', 'our', 'a', 'an',
   'list', 'cart', 'items', 'item', 'grocery', 'and', 'or', 'also', 'too',
   'then', 'with', 'plus', 'of', 'to', 'in', 'on', 'at', 'for', 'from',
-  'as', 'well', 'buy', 'add', 'get', 'need', 'want',
+  'as', 'well', 'buy', 'buying', 'add', 'adding', 'get', 'getting', 'need', 'want',
 ]);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -64,6 +64,13 @@ const ADJECTIVE_MODIFIERS = new Set([
   'dairy-free', 'extra', 'pure', 'good', 'bad',
 ]);
 
+const COMMON_GROCERY_WORDS = new Set([
+  'apple', 'apples', 'banana', 'bananas', 'orange', 'oranges', 'mango', 'mangoes',
+  'milk', 'bread', 'eggs', 'egg', 'water', 'rice', 'tomato', 'tomatoes',
+  'potato', 'potatoes', 'onion', 'onions', 'carrot', 'carrots', 'cheese',
+  'butter', 'yogurt', 'chicken', 'fish', 'coffee', 'tea', 'sugar', 'salt',
+]);
+
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 function normalizeText(text: string): string {
@@ -72,6 +79,11 @@ function normalizeText(text: string): string {
     .replace(/[!?:]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function normalizeSpeechMistakes(text: string): string {
+  // Chromium occasionally merges "add a" into the name "Adam".
+  return text.replace(/^adam\s+(?=\S)/i, 'add a ');
 }
 
 function extractQuantityAndUnit(tokens: string[]): {
@@ -207,7 +219,7 @@ export function parseVoiceCommand(
   raw: string,
   language: SupportedLanguage = 'en-US'
 ): ParsedCommand {
-  const normalized = normalizeText(raw);
+  const normalized = normalizeSpeechMistakes(normalizeText(raw));
   const intent = detectIntent(normalized, language);
 
   if (intent === 'CLEAR') {
@@ -317,7 +329,7 @@ export function parseVoiceCommands(
   raw: string,
   language: SupportedLanguage = 'en-US'
 ): ParsedCommand[] {
-  const normalized = normalizeText(raw);
+  const normalized = normalizeSpeechMistakes(normalizeText(raw));
   const intent = detectIntent(normalized, language);
 
   // CLEAR and SEARCH don't have multi-item variants — return single command
@@ -327,6 +339,26 @@ export function parseVoiceCommands(
 
   // Strip intent phrases (e.g. "add", "please put on my list")
   const stripped = stripIntentPhrases(normalized, language);
+
+  const strippedTokens = stripped.split(' ').filter(Boolean);
+  if (
+    strippedTokens.length === 2 &&
+    strippedTokens.every((token) => COMMON_GROCERY_WORDS.has(token))
+  ) {
+    return strippedTokens.map((item) => ({
+      intent,
+      item,
+      quantity: 1,
+      raw: item,
+    }));
+  }
+
+  // A quantity-led phrase is usually one product name ("3 water apples"),
+  // not an unpunctuated list. Only split multiple items when the speaker
+  // gives an explicit delimiter such as a comma or conjunction.
+  if (/^(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|a|an|half)\b/i.test(stripped)) {
+    return [parseVoiceCommand(raw, language)];
+  }
 
   // Step 1: Split on explicit delimiters: commas, semicolons, conjunctions
   const rawParts = stripped
@@ -344,6 +376,9 @@ export function parseVoiceCommands(
       if (!NOISE_WORDS.has(part.toLowerCase())) {
         subItems.push(part);
       }
+    } else if (cleanTokens.every((token) => COMMON_GROCERY_WORDS.has(token))) {
+      // Spoken lists often arrive without commas: "apple banana".
+      subItems.push(...cleanTokens);
     } else {
       // Intelligently segment unpunctuated tokens
       const segmented = splitUnpunctuatedItems(cleanTokens);

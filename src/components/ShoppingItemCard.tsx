@@ -29,8 +29,8 @@ export function ShoppingItemCard({
       className={clsx(
         'flex items-center gap-3 p-3 rounded-xl border transition-all duration-200',
         item.checked
-          ? 'bg-white/5 border-white/5 opacity-60'
-          : 'bg-white/10 border-white/10 hover:bg-white/15'
+          ? 'bg-[#f0f2ed] border-[#e1e6dd] opacity-60'
+          : 'bg-white border-[#d7dfd4] hover:border-[#a6c9a5]'
       )}
     >
       {/* Checkbox */}
@@ -56,13 +56,13 @@ export function ShoppingItemCard({
         <p
           className={clsx('text-sm font-medium capitalize truncate', {
             'line-through text-slate-500': item.checked,
-            'text-slate-100': !item.checked,
+            'text-[#18221d]': !item.checked,
           })}
         >
           {item.name}
         </p>
         {item.note && (
-          <p className="text-xs text-slate-500 truncate">{item.note}</p>
+          <p className="text-xs text-[#607168] truncate">{item.note}</p>
         )}
       </div>
 
@@ -71,17 +71,17 @@ export function ShoppingItemCard({
         <button
           onClick={() => onQuantityChange(item.id, item.quantity - 1)}
           disabled={item.quantity <= 1}
-          className="p-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          className="p-1 rounded-lg bg-[#f6f3ec] hover:bg-[#e8efe5] text-[#607168] hover:text-[#18221d] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           aria-label="Decrease quantity"
         >
           <Minus className="w-3 h-3" />
         </button>
-        <span className="text-sm font-mono text-slate-200 w-8 text-center">
+        <span className="text-sm font-mono text-[#18221d] min-w-[4.5rem] whitespace-nowrap text-center">
           {item.quantity}{item.unit ? ` ${item.unit}` : ''}
         </span>
         <button
           onClick={() => onQuantityChange(item.id, item.quantity + 1)}
-          className="p-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-slate-200 transition-all"
+          className="p-1 rounded-lg bg-[#f6f3ec] hover:bg-[#e8efe5] text-[#607168] hover:text-[#18221d] transition-all"
           aria-label="Increase quantity"
         >
           <Plus className="w-3 h-3" />
@@ -92,7 +92,7 @@ export function ShoppingItemCard({
       <button
         onClick={() => onRemove(item.id)}
         aria-label="Remove item"
-        className="flex-shrink-0 p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-all"
+        className="flex-shrink-0 p-1.5 rounded-lg text-[#607168] hover:text-red-600 hover:bg-red-50 transition-all"
       >
         <Trash2 className="w-4 h-4" />
       </button>

@@ -22,7 +22,7 @@ export const LANGUAGE_INTENT_KEYWORDS: Record<SupportedLanguage, {
   clear: string[];
 }> = {
   'en-US': {
-    add:    ['add', 'buy', 'get', 'need', 'want', 'put', 'include', 'pick up'],
+    add:    ['add', 'adding', 'buy', 'buying', 'get', 'getting', 'need', 'want', 'put', 'include', 'pick up'],
     remove: ['remove', 'delete', 'take off', 'drop', 'cancel', 'dont need', "don't need"],
     check:  ['check', 'done', 'got', 'have', 'checked'],
     search: ['find', 'search', 'look for', 'show me', 'where is'],

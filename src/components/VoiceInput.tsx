@@ -6,7 +6,7 @@ import { Mic, MicOff, Loader2, AlertCircle } from 'lucide-react';
 import clsx from 'clsx';
 import { useVoiceRecognition } from '@/hooks/useVoiceRecognition';
 import { WaveformVisualizer } from '@/components/WaveformVisualizer';
-import { parseVoiceCommands } from '@/lib/nlp/intentParser';
+import { interpretCommand } from '@/lib/nlp/commandInterpreter';
 import { SupportedLanguage, ParsedCommand } from '@/types';
 
 interface VoiceInputProps {
@@ -18,9 +18,9 @@ export function VoiceInput({ language, onCommand }: VoiceInputProps) {
   const [interimText, setInterimText] = useState('');
 
   const handleResult = useCallback(
-    (transcript: string) => {
+    async (transcript: string) => {
       // parseVoiceCommands splits "add mango, banana and apple" into 3 commands
-      const commands = parseVoiceCommands(transcript, language);
+      const commands = await interpretCommand(transcript, language);
       commands.forEach((cmd) => onCommand(cmd));
       setTimeout(() => setInterimText(''), 1500);
     },

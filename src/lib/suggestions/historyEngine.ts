@@ -1,5 +1,5 @@
-import { ItemCategory, ItemHistory, Suggestion } from '@/types';
-import { categorizeItem } from '@/lib/categories';
+import { ItemHistory, Suggestion } from '@/types';
+import { categorizeItem, normalizeProductName } from '@/lib/categories';
 
 const HISTORY_KEY = 'vsa_item_history';
 
@@ -9,7 +9,12 @@ export function loadHistory(): ItemHistory[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(HISTORY_KEY);
-    return raw ? (JSON.parse(raw) as ItemHistory[]) : [];
+    if (!raw) return [];
+    return (JSON.parse(raw) as ItemHistory[]).map((item) => ({
+      ...item,
+      name: normalizeProductName(item.name),
+      category: categorizeItem(item.name),
+    }));
   } catch {
     return [];
   }
@@ -18,7 +23,7 @@ export function loadHistory(): ItemHistory[] {
 export function recordItemAdded(name: string): void {
   if (typeof window === 'undefined') return;
   const history = loadHistory();
-  const normalized = name.toLowerCase().trim();
+  const normalized = normalizeProductName(name);
   const existing = history.find((h) => h.name === normalized);
 
   if (existing) {
@@ -59,7 +64,8 @@ export function getHistorySuggestions(
   const currentSet = new Set(currentItemNames.map((n) => n.toLowerCase()));
 
   return history
-    .filter((h) => !currentSet.has(h.name))
+    // "Adam" is a known Chromium transcription artifact for "add a".
+    .filter((h) => h.name !== 'adam' && !currentSet.has(h.name))
     .sort((a, b) => {
       // Recency + frequency weighted score
       const scoreA = a.addedCount * 0.6 + (Date.now() - a.lastAdded < 7 * 86400_000 ? 2 : 0);
