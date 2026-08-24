@@ -2,7 +2,19 @@
 
 A voice-powered shopping list manager with smart suggestions, multilingual support, and offline capability — built as a technical assessment project.
 
-**Live Demo:** Deploy your fork to Vercel and add the resulting URL here before submitting.
+**Live Demo:** [voice-shopping-assistant-self.vercel.app](https://voice-shopping-assistant-self.vercel.app/)
+
+---
+
+## 📸 Screenshots
+
+| Shopping list | Price & attribute filters |
+|---|---|
+| ![Shopping list grouped by category, with quick add and smart suggestions](public/screenshots/01-desktop-list.png) | ![Voice search filtered to organic items under $5](public/screenshots/02-desktop-search-filter.png) |
+
+| Voice command log | Mobile view |
+|---|---|
+| ![Every recognized voice/typed command, timestamped](public/screenshots/03-desktop-voice-log.png) | ![Mobile-first responsive layout](public/screenshots/04-mobile-list.png) |
 
 ---
 
@@ -42,6 +54,7 @@ Three independent suggestion layers:
 - **Voice command log**: Every recognized phrase is timestamped and logged
 - **Typed command fallback**: Run the same add, remove, check, clear, and search intents without a microphone
 - **Live list filter**: Search the current list by typing or saying "find ..."
+- **Price & attribute search**: "Find toothpaste under $5" or "find organic items" filters by an estimated per-item price and dietary/attribute tags (organic, vegan, gluten-free…) parsed from the item name; active filters show as clearable pills above the list
 
 ### 🔗 Shareable Lists
 Encode the full shopping list as a URL query parameter — anyone with the link can open it in their browser (no account needed).
@@ -53,11 +66,27 @@ Encode the full shopping list as a URL query parameter — anyone with the link 
 
 ---
 
+## 🛠️ Tech Stack
+
+| Technology | Purpose |
+|-----------|---------|
+| Next.js 16 (App Router) | Framework + SSR |
+| TypeScript | Type safety |
+| Tailwind CSS v4 | Styling |
+| Framer Motion | Animations |
+| Web Speech API | Voice recognition (free, browser-native) |
+| Web Audio API | Live waveform visualization |
+| localStorage | List + history persistence |
+| Vercel | Hosting + CI/CD |
+
+---
+
 ## 🏗️ Architecture
 
 ```
 src/
 ├── app/                    # Next.js App Router
+│   ├── api/interpret/      # Optional Gemini-backed NLP fallback route
 │   ├── layout.tsx          # Root layout (PWA meta, font)
 │   └── page.tsx            # Main orchestration page
 ├── components/
@@ -74,6 +103,7 @@ src/
 └── lib/
     ├── nlp/intentParser    # Custom intent+entity extraction engine
     ├── categories.ts       # Keyword-based item categorization
+    ├── pricing.ts          # Deterministic estimated pricing (no backend catalog)
     ├── suggestions/
     │   ├── historyEngine   # Frequency/recency-weighted history
     │   ├── seasonalEngine  # Month + holiday-based suggestions
@@ -87,7 +117,7 @@ src/
 
 > Built with Next.js 16, TypeScript, and Tailwind CSS. The app uses the browser-native Web Speech API for voice recognition — requiring no external API keys or costs — making it instantly deployable and free to use.
 >
-> The NLP layer is a custom intent parser built on pattern matching. It extracts intents (ADD/REMOVE/SEARCH/CHECK/CLEAR), entities (item names), and quantities from natural language phrases without relying on a cloud NLP service, keeping latency under 50ms and working completely offline.
+> The NLP layer is a custom intent parser built on pattern matching. It extracts intents (ADD/REMOVE/SEARCH/CHECK/CLEAR), entities (item names), quantities, an estimated price ceiling, and attribute tags from natural language phrases without relying on a cloud NLP service, keeping latency under 50ms and working completely offline.
 >
 > Smart suggestions are powered by a three-layer engine: a frequency-based history engine (items you buy most), a seasonal engine (current month's produce/holidays), and a substitutes database (common product alternatives). List data and history live in localStorage; the optional Gemini route is used only for broad-language interpretation.
 >
@@ -105,6 +135,12 @@ Smart suggestions combine local purchase history, month-aware seasonal produce, 
 
 ## 🚀 Getting Started
 
+### Prerequisites
+- Node.js 18+
+- **Chrome or Edge** (required for the Web Speech API)
+
+### Installation
+
 ```bash
 # Clone the repo
 git clone https://github.com/Shub-ways/voice-shopping-assistant.git
@@ -117,7 +153,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in **Chrome or Edge** (required for Web Speech API).
+Open [http://localhost:3000](http://localhost:3000) in **Chrome or Edge**.
 
 > ⚠️ **Important**: Voice recognition requires microphone permission and works in Chromium-based browsers. Safari has partial support; Firefox does not support the Web Speech API.
 
@@ -131,28 +167,16 @@ GEMINI_API_KEY=your_key_here
 
 The voice flow sends only the transcript to `/api/interpret`. The key is never exposed to the browser. If the key is missing, the request fails, or the device is offline, SayCart automatically uses its local parser. The list itself remains available offline, while browser speech recognition may require an internet connection.
 
-Before submitting, run:
+### Scripts
 
 ```bash
-npm run lint
-npm run typecheck
-npm run build
+npm run dev         # Start dev server (Turbopack)
+npm run build       # Production build
+npm run lint        # ESLint
+npm run typecheck   # tsc --noEmit
 ```
 
----
-
-## 🛠️ Tech Stack
-
-| Technology | Purpose |
-|-----------|---------|
-| Next.js 16 (App Router) | Framework + SSR |
-| TypeScript | Type safety |
-| Tailwind CSS v4 | Styling |
-| Framer Motion | Animations |
-| Web Speech API | Voice recognition (free, browser-native) |
-| Web Audio API | Live waveform visualization |
-| localStorage | List + history persistence |
-| Vercel | Hosting + CI/CD |
+Run all three before submitting.
 
 ---
 
@@ -176,6 +200,7 @@ To deploy your own instance:
 | "I need two bottles of water" | Adds water (qty: 2, unit: bottle) |
 | "Remove bread from my list" | Removes bread |
 | "I got the eggs" | Checks off eggs |
+| "Find organic under $5" | Filters the list to organic items priced under $5 |
 | "Clear my list" | Clears everything |
 | "जोड़ो दूध" | Adds milk (Hindi) |
 | "Añadir manzanas" | Adds apples (Spanish) |
